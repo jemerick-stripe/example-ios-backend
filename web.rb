@@ -47,16 +47,21 @@ post '/capture_payment' do
 
   # Create and capture the PaymentIntent via Stripe's API - this will charge the user's card
   begin
-    payment_intent = create_and_capture_payment_intent(
-      payload[:amount],
-      payload[:source],
-      payload[:payment_method],
-      payload[:customer_id] || @customer.id,
-      payload[:metadata],
-      'usd',
-      payload[:shipping],
-      payload[:return_url],
-    )
+    payment_intent_id = ENV['DEFAULT_PAYMENT_INTENT_ID']
+    if payment_intent_id
+      payment_intent = Stripe::PaymentIntent.retrieve(payment_intent_id)
+    else
+      payment_intent = create_and_capture_payment_intent(
+        payload[:amount],
+        payload[:source],
+        payload[:payment_method],
+        payload[:customer_id] || @customer.id,
+        payload[:metadata],
+        'usd',
+        payload[:shipping],
+        payload[:return_url],
+      )
+    end
   rescue Stripe::StripeError => e
     status 402
     return log_info("Error: #{e.message}")
@@ -75,7 +80,7 @@ post '/confirm_payment' do
         payload = Sinatra::IndifferentHash[JSON.parse(request.body.read)]
     end
     begin
-        payment_intent = Stripe::PaymentIntent.confirm(payload[:payment_intent_id])
+        payment_intent = Stripe::PaymentIntent.confirm(payload[:payment_intent_id], {:use_stripe_sdk => true})
         rescue Stripe::StripeError => e
         status 402
         return log_info("Error: #{e.message}")
@@ -98,30 +103,38 @@ def authenticate!
     rescue Stripe::InvalidRequestError
     end
   else
-    begin
-      @customer = Stripe::Customer.create(
-        :description => 'mobile SDK example customer',
-        :metadata => {
-          # Add our application's customer id for this Customer, so it'll be easier to look up
-          :my_customer_id => '72F8C533-FCD5-47A6-A45B-3956CA8C792D',
-        },
-      )
-      # Attach some test cards to the customer for testing convenience.
-      # See https://stripe.com/docs/testing#cards
-      ['pm_card_threeDSecure2Required', 'pm_card_visa'].each { |pm_id|
-        Stripe::PaymentMethod.attach(
-          pm_id,
-          {
-            customer: @customer.id,
-          }
-        )
+    default_cusomer_id = ENV['DEFAULT_CUSTOMER_ID']
+    if default_cusomer_id
+      @customer = Stripe::Customer.retrieve(default_cusomer_id)
+    else
+      begin
+        @customer = create_customer()
+        # Attach some test cards to the customer for testing convenience.
+        # See https://stripe.com/docs/testing#cards
+        ['pm_card_threeDSecure2Required', 'pm_card_visa'].each { |pm_id|
+          Stripe::PaymentMethod.attach(
+            pm_id,
+            {
+              customer: @customer.id,
+            }
+          )
         }
-
-    rescue Stripe::InvalidRequestError
+      rescue Stripe::InvalidRequestError
+      end
     end
     session[:customer_id] = @customer.id
   end
   @customer
+end
+
+def create_customer
+  Stripe::Customer.create(
+    :description => 'mobile SDK example customer',
+    :metadata => {
+      # Add our application's customer id for this Customer, so it'll be easier to look up
+      :my_customer_id => '72F8C533-FCD5-47A6-A45B-3956CA8C792D',
+    },
+  )
 end
 
 # This endpoint is used by the mobile example apps to create a SetupIntent.
@@ -129,9 +142,17 @@ end
 # Just like the `/capture_payment` endpoint, a real implementation would include controls
 # to prevent misuse
 post '/create_setup_intent' do
+  payload = params
+  if request.content_type != nil and request.content_type.include? 'application/json' and params.empty?
+      payload = Sinatra::IndifferentHash[JSON.parse(request.body.read)]
+  end
   begin
     setup_intent = Stripe::SetupIntent.create({
       payment_method_types: ['card'],
+      payment_method: payload[:payment_method],
+      return_url: payload[:return_url],
+      confirm: payload[:payment_method] != nil,
+      use_stripe_sdk: payload[:payment_method] != nil ? true : nil,
     })
   rescue Stripe::StripeError => e
     status 402
@@ -153,16 +174,21 @@ end
 # to prevent misuse
 post '/create_intent' do
   begin
-    payment_intent = create_payment_intent(
-      params[:amount],
-      nil,
-      nil,
-      nil,
-      params[:metadata],
-      params[:currency],
-      nil,
-      nil
-    )
+    payment_intent_id = ENV['DEFAULT_PAYMENT_INTENT_ID']
+    if payment_intent_id
+      payment_intent = Stripe::PaymentIntent.retrieve(payment_intent_id)
+    else
+      payment_intent = create_payment_intent(
+        params[:amount],
+        nil,
+        nil,
+        nil,
+        params[:metadata],
+        params[:currency],
+        nil,
+        nil
+      )
+    end
   rescue Stripe::StripeError => e
     status 402
     return log_info("Error creating PaymentIntent: #{e.message}")
@@ -231,6 +257,8 @@ def create_payment_intent(amount, source_id, payment_method_id, customer_id = ni
     :return_url => return_url,
     :confirm => confirm,
     :confirmation_method => confirm ? "manual" : "automatic",
+    :use_stripe_sdk => confirm ? true : nil,
+    :capture_method => ENV['CAPTURE_METHOD'] == "manual" ? "manual" : "automatic",
     :metadata => {
       :order_id => '5278735C-1F40-407D-933A-286E463E72D8',
     }.merge(metadata || {}),
@@ -239,7 +267,6 @@ end
 
 def create_and_capture_payment_intent(amount, source_id, payment_method_id, customer_id = nil,
                                       metadata = {}, currency = 'usd', shipping = nil, return_url = nil)
-  payment_intent = create_payment_intent(amount, source_id, payment_method_id, customer_id,
+  return create_payment_intent(amount, source_id, payment_method_id, customer_id,
                                           metadata, currency, shipping, return_url, true)
-  return payment_intent
 end
