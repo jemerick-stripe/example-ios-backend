@@ -55,9 +55,16 @@ post '/capture_payment' do
         payload[:amount],
         payload[:source],
         payload[:payment_method],
+<<<<<<< HEAD
         payload[:customer_id] || @customer.id,
         payload[:metadata],
         'usd',
+=======
+        payload[:payment_method_types] || ['card'],
+        payload[:customer_id] || @customer.id,
+        payload[:metadata],
+        payload[:currency] || 'usd',
+>>>>>>> 0f3c3de6de1f9e5cbd02328af435164f4b88bef4
         payload[:shipping],
         payload[:return_url],
       )
@@ -148,10 +155,11 @@ post '/create_setup_intent' do
   end
   begin
     setup_intent = Stripe::SetupIntent.create({
-      payment_method_types: ['card'],
+      payment_method_types: payload[:payment_method_types] || ['card'],
       payment_method: payload[:payment_method],
       return_url: payload[:return_url],
       confirm: payload[:payment_method] != nil,
+      customer: payload[:customer_id],
       use_stripe_sdk: payload[:payment_method] != nil ? true : nil,
     })
   rescue Stripe::StripeError => e
@@ -182,6 +190,10 @@ post '/create_intent' do
         params[:amount],
         nil,
         nil,
+<<<<<<< HEAD
+=======
+        params[:payment_method_types] || ['card'],
+>>>>>>> 0f3c3de6de1f9e5cbd02328af435164f4b88bef4
         nil,
         params[:metadata],
         params[:currency],
@@ -225,6 +237,7 @@ post '/stripe-webhook' do
         source.amount,
         source.id,
         nil,
+        ['card'],
         source.metadata["customer"],
         source.metadata,
         source.currency,
@@ -243,7 +256,7 @@ post '/stripe-webhook' do
   status 200
 end
 
-def create_payment_intent(amount, source_id, payment_method_id, customer_id = nil,
+def create_payment_intent(amount, source_id, payment_method_id, payment_method_types = ['card'], customer_id = nil,
                           metadata = {}, currency = 'usd', shipping = nil, return_url = nil, confirm = false)
   return Stripe::PaymentIntent.create(
     :amount => amount,
@@ -251,7 +264,7 @@ def create_payment_intent(amount, source_id, payment_method_id, customer_id = ni
     :customer => customer_id,
     :source => source_id,
     :payment_method => payment_method_id,
-    :payment_method_types => ['card'],
+    :payment_method_types => payment_method_types,
     :description => "Example PaymentIntent",
     :shipping => shipping,
     :return_url => return_url,
@@ -265,8 +278,16 @@ def create_payment_intent(amount, source_id, payment_method_id, customer_id = ni
   )
 end
 
+<<<<<<< HEAD
 def create_and_capture_payment_intent(amount, source_id, payment_method_id, customer_id = nil,
                                       metadata = {}, currency = 'usd', shipping = nil, return_url = nil)
   return create_payment_intent(amount, source_id, payment_method_id, customer_id,
                                           metadata, currency, shipping, return_url, true)
+=======
+def create_and_capture_payment_intent(amount, source_id, payment_method_id, payment_method_types = ['card'],
+                                      customer_id = nil, metadata = {}, currency = 'usd', shipping = nil,
+                                      return_url = nil)
+  return create_payment_intent(amount, source_id, payment_method_id, payment_method_types,
+                               customer_id, metadata, currency, shipping, return_url, true)
+>>>>>>> 0f3c3de6de1f9e5cbd02328af435164f4b88bef4
 end
