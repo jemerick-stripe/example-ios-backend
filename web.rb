@@ -55,16 +55,10 @@ post '/capture_payment' do
         payload[:amount],
         payload[:source],
         payload[:payment_method],
-<<<<<<< HEAD
-        payload[:customer_id] || @customer.id,
-        payload[:metadata],
-        'usd',
-=======
         payload[:payment_method_types] || ['card'],
         payload[:customer_id] || @customer.id,
         payload[:metadata],
         payload[:currency] || 'usd',
->>>>>>> 0f3c3de6de1f9e5cbd02328af435164f4b88bef4
         payload[:shipping],
         payload[:return_url],
       )
@@ -190,10 +184,7 @@ post '/create_intent' do
         params[:amount],
         nil,
         nil,
-<<<<<<< HEAD
-=======
         params[:payment_method_types] || ['card'],
->>>>>>> 0f3c3de6de1f9e5cbd02328af435164f4b88bef4
         nil,
         params[:metadata],
         params[:currency],
@@ -278,16 +269,9 @@ def create_payment_intent(amount, source_id, payment_method_id, payment_method_t
   )
 end
 
-<<<<<<< HEAD
-def create_and_capture_payment_intent(amount, source_id, payment_method_id, customer_id = nil,
-                                      metadata = {}, currency = 'usd', shipping = nil, return_url = nil)
-  return create_payment_intent(amount, source_id, payment_method_id, customer_id,
-                                          metadata, currency, shipping, return_url, true)
-=======
 def create_and_capture_payment_intent(amount, source_id, payment_method_id, payment_method_types = ['card'],
                                       customer_id = nil, metadata = {}, currency = 'usd', shipping = nil,
                                       return_url = nil)
   return create_payment_intent(amount, source_id, payment_method_id, payment_method_types,
                                customer_id, metadata, currency, shipping, return_url, true)
->>>>>>> 0f3c3de6de1f9e5cbd02328af435164f4b88bef4
 end
